@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>docket editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #08090a;
+      --side: #0f1011;
+      --panel: #0f1011;
+      --elev: #141516;
+      --hover: #18191b;
+      --active: #1c1c1f;
+      --line: #232326;
+      --text: #f7f8f8;
+      --mute: #8a8f98;
+      --faint: #62666d;
+      --accent: #5e6ad2;
+      --todo: #8a8f98;
+      --progress: #f2c14e;
+      --blocked: #eb5757;
+      --done: #5e6ad2;
+      --draft: #6b7180;
+      --high: #eb5757;
+      --medium: #f2c14e;
+      --low: #8a8f98;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+    body {
+      font-family: Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr) minmax(320px, 420px);
+      height: 100%;
+    }
+    .app.blank, .app.is-board { grid-template-columns: 220px 1fr; }
+    aside {
+      background: var(--side);
+      border-right: 1px solid var(--line);
+      padding: 14px 10px 20px;
+      overflow: auto;
+    }
+    .workspace {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px 14px;
+    }
+    .mark-team {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      background: linear-gradient(135deg, #5e6ad2, #8b93e8);
+      flex: none;
+    }
+    .workspace h1 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .workspace small { display: block; color: var(--faint); font-size: 11px; font-weight: 400; }
+    .new {
+      width: 100%;
+      height: 32px;
+      margin: 0 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--elev);
+      color: var(--text);
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .new:hover { background: var(--active); }
+    .nav-label {
+      padding: 8px 8px 4px;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      height: 30px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--mute);
+      font: inherit;
+      cursor: pointer;
+    }
+    .nav-item:hover { background: var(--hover); color: var(--text); }
+    .nav-item.on { background: var(--active); color: var(--text); }
+    .nav-item span { display: flex; align-items: center; gap: 8px; }
+    .count { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 11px; }
+    main { display: flex; flex-direction: column; min-width: 0; background: var(--panel); }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 44px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .toolbar h2 { margin: 0; font-size: 13px; font-weight: 500; }
+    .views {
+      display: flex;
+      gap: 2px;
+      margin-left: 8px;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--bg);
+    }
+    .views button {
+      width: 28px;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+    }
+    .views button.on { background: var(--active); color: var(--text); }
+    .views svg { display: block; margin: 5px auto; }
+    .toolbar input {
+      margin-left: auto;
+      width: 200px;
+      height: 28px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+    .toolbar input:focus { outline: 1px solid #3d4260; }
+    .list { overflow: auto; flex: 1; min-height: 0; }
+    .list:has(.board) { overflow: hidden; display: flex; }
+    .composer {
+      display: none;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--elev);
+    }
+    .composer.open { display: grid; }
+    .composer input, .prop select, .notes, .title-edit, .blocked-edit {
+      width: 100%;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font: inherit;
+    }
+    .composer input {
+      height: 32px;
+      padding: 0 8px;
+      border-color: var(--line);
+      background: var(--bg);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 16px 72px minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 10px;
+      height: 36px;
+      padding: 0 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+    }
+    .row:hover { background: var(--hover); }
+    .row.on { background: var(--active); }
+    .tid {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      color: var(--faint);
+    }
+    .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: #f7f8f8; }
+    .chip {
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 1px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--mute);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .icon { width: 14px; height: 14px; display: block; }
+    .icon circle { fill: none; stroke-width: 1.5; }
+    .icon.todo circle { stroke: var(--todo); }
+    .icon.draft circle { stroke: var(--draft); stroke-dasharray: 2.2 1.8; }
+    .icon.progress circle { stroke: var(--progress); }
+    .icon.progress path { fill: var(--progress); stroke: none; }
+    .icon.blocked circle, .icon.blocked path { stroke: var(--blocked); fill: none; }
+    .icon.done circle { fill: var(--done); stroke: var(--done); }
+    .icon.done path { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .pri { width: 14px; height: 14px; color: var(--faint); }
+    .pri.high { color: var(--high); }
+    .pri.medium { color: var(--medium); }
+    .pri.low { color: var(--low); }
+    .empty, .blank { color: var(--faint); padding: 28px 16px; }
+    .sheet {
+      overflow: auto;
+      background: var(--elev);
+      border-left: 1px solid var(--line);
+    }
+    .issue { padding: 22px 22px 40px; }
+    .issue-id { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--faint); }
+    .title-edit {
+      display: block;
+      width: 100%;
+      margin: 6px 0 18px;
+      padding: 0;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      resize: none;
+    }
+    .title-edit:focus, .notes:focus, .blocked-edit:focus, .prop select:focus, .composer input:focus {
+      outline: none;
+      box-shadow: 0 0 0 1px #3d4260;
+    }
+    .props { display: grid; gap: 2px; margin-bottom: 22px; }
+    .prop {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      align-items: center;
+      min-height: 32px;
+      color: var(--faint);
+      font-size: 12px;
+    }
+    .prop select, .blocked-edit {
+      height: 28px;
+      padding: 0 6px;
+      border-color: transparent;
+      color: var(--text);
+    }
+    .prop select:hover, .blocked-edit:hover { background: var(--hover); }
+    .notes {
+      min-height: 180px;
+      padding: 10px 0;
+      color: #d0d6e0;
+      font-size: 14px;
+      line-height: 1.55;
+      resize: vertical;
+    }
+    .actions { display: flex; gap: 8px; margin-top: 20px; }
+    button.ghost, button.danger {
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--mute);
+      font: inherit;
+      cursor: pointer;
+    }
+    button.ghost:hover { background: var(--hover); color: var(--text); }
+    button.danger { color: #f2b8b5; }
+    .err { color: var(--blocked); font-size: 12px; min-height: 1.2em; }
+    .board {
+      display: flex;
+      gap: 10px;
+      height: 100%;
+      padding: 12px;
+      overflow: auto;
+      align-items: stretch;
+    }
+    .col {
+      display: flex;
+      flex-direction: column;
+      flex: 0 0 280px;
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0c0d0e;
+    }
+    .col.over { outline: 1px solid var(--accent); }
+    .col-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 36px;
+      padding: 0 10px;
+      color: var(--mute);
+      font-size: 12px;
+      font-weight: 500;
+      border-bottom: 1px solid var(--line);
+    }
+    .col-head .count { margin-left: auto; }
+    .col-body { flex: 1; overflow: auto; padding: 8px; }
+    .card {
+      padding: 10px 10px 8px;
+      margin-bottom: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--elev);
+      cursor: grab;
+    }
+    .card:hover { background: var(--hover); }
+    .card.on { box-shadow: inset 0 0 0 1px var(--accent); }
+    .card-title { font-weight: 500; line-height: 1.35; margin-bottom: 8px; }
+    .card-meta { display: flex; align-items: center; gap: 8px; }
+    .card .chip { max-width: 120px; }
+    .add-col {
+      width: 100%;
+      height: 28px;
+      border: 0;
+      background: transparent;
+      color: var(--faint);
+      font: inherit;
+      text-align: left;
+      padding: 0 10px 8px;
+      cursor: pointer;
+    }
+    .add-col:hover { color: var(--text); }
+    .app.is-board .sheet {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(420px, 42vw);
+      z-index: 4;
+      box-shadow: -18px 0 48px rgba(0,0,0,0.55);
+    }
+    @media (max-width: 980px) {
+      .app, .app.blank { grid-template-columns: 1fr; }
+      aside { display: none; }
+      .sheet { border-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app blank" id="app">
+    <aside>
+      <div class="workspace">
+        <div class="mark-team" aria-hidden="true"></div>
+        <div>
+          <h1 id="name">docket</h1>
+          <small id="cite">editor</small>
+        </div>
+      </div>
+      <button class="new" id="new" type="button">New issue</button>
+      <div class="nav-label">Issues</div>
+      <div id="nav"></div>
+    </aside>
+    <main>
+      <div class="toolbar">
+        <h2 id="view-title">All issues</h2>
+        <div class="views" role="tablist">
+          <button type="button" id="view-list" class="on" title="List" aria-label="List view">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="2" width="12" height="1.7" rx=".4"/><rect x="1" y="6.15" width="12" height="1.7" rx=".4"/><rect x="1" y="10.3" width="12" height="1.7" rx=".4"/></svg>
+          </button>
+          <button type="button" id="view-board" title="Board" aria-label="Board view">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="1.5" width="3.4" height="11" rx=".7"/><rect x="5.3" y="1.5" width="3.4" height="11" rx=".7"/><rect x="9.6" y="1.5" width="3.4" height="11" rx=".7"/></svg>
+          </button>
+        </div>
+        <input id="q" type="search" placeholder="Search" autocomplete="off">
+      </div>
+      <form class="composer" id="composer">
+        <input name="title" placeholder="Issue title" autocomplete="off" required>
+        <button class="new" type="submit" style="width:auto;margin:0;padding:0 12px">Create</button>
+      </form>
+      <div class="list" id="list"></div>
+    </main>
+    <section class="sheet" id="sheet" hidden></section>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const FILTERS = [
+      ["all", "All issues"],
+      ["To Do", "Todo"],
+      ["In Progress", "In Progress"],
+      ["Done", "Done"],
+      ["Draft", "Draft"],
+      ["blocked", "Blocked"],
+    ];
+    const COLUMNS = ["To Do", "In Progress", "Done", "Draft"];
+    const params = new URLSearchParams(location.search);
+    let state = { tasks: [], milestones: [], project: {}, tool: {} };
+    let selected = params.get("id") || "";
+    let view = params.get("view") === "board" ? "board" : "list";
+    let filter = "all";
+    let query = "";
+    let addCol = "";
+
+    function syncURL() {
+      const next = new URLSearchParams();
+      if (view === "board") next.set("view", "board");
+      if (selected) next.set("id", selected);
+      history.replaceState(null, "", next.toString() ? "?" + next.toString() : location.pathname);
+    }
+
+    function kind(t) {
+      if (t.blocked_reason) return "blocked";
+      if (t.status === "In Progress") return "progress";
+      if (t.status === "Done") return "done";
+      if (t.status === "Draft") return "draft";
+      return "todo";
+    }
+
+    function statusMark(t) {
+      const k = kind(t);
+      if (k === "done") return `<svg class="icon done" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6"/><path d="M4.2 7.1l1.8 1.8 3.8-3.8"/></svg>`;
+      if (k === "progress") return `<svg class="icon progress" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6"/><path d="M7 2.2A4.8 4.8 0 0 1 11.8 7H7z"/></svg>`;
+      if (k === "blocked") return `<svg class="icon blocked" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6"/><path d="M4.2 4.2l5.6 5.6"/></svg>`;
+      return `<svg class="icon ${k}" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6"/></svg>`;
+    }
+
+    function priMark(p) {
+      const n = p === "high" ? 3 : p === "medium" ? 2 : p === "low" ? 1 : 0;
+      if (!n) return `<svg class="pri" viewBox="0 0 14 14"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="1.6 1.5"/></svg>`;
+      const bars = [[3,10],[6,8],[9,6]].slice(0, n).map(([x,h]) => `<rect x="${x}" y="${14-h-2}" width="2" height="${h}" rx="0.6" fill="currentColor"/>`).join("");
+      return `<svg class="pri ${p}" viewBox="0 0 14 14">${bars}</svg>`;
+    }
+
+    function milestoneTitle(id) {
+      const m = (state.milestones || []).find((x) => x.id === id);
+      return m ? m.title : id;
+    }
+
+    function counts() {
+      const c = { all: state.tasks.length, "To Do": 0, "In Progress": 0, Done: 0, Draft: 0, blocked: 0 };
+      for (const t of state.tasks) {
+        c[t.status] = (c[t.status] || 0) + 1;
+        if (t.blocked_reason) c.blocked += 1;
+      }
+      return c;
+    }
+
+    function visible() {
+      return state.tasks.filter((t) => {
+        if (filter === "blocked" && !t.blocked_reason) return false;
+        if (filter !== "all" && filter !== "blocked" && t.status !== filter) return false;
+        if (query && !`${t.id} ${t.title} ${t.notes}`.toLowerCase().includes(query)) return false;
+        return true;
+      });
+    }
+
+    async function load() {
+      const res = await fetch("/api/state");
+      if (!res.ok) throw new Error(await res.text());
+      state = await res.json();
+      $("name").textContent = state.project.name || "docket";
+      $("cite").textContent = "docket editor";
+      if (selected && !state.tasks.some((t) => t.id === selected)) selected = "";
+      render();
+    }
+
+    function setView(next) {
+      view = next;
+      $("view-list").classList.toggle("on", view === "list");
+      $("view-board").classList.toggle("on", view === "board");
+      $("app").classList.toggle("is-board", view === "board");
+      syncURL();
+      render();
+    }
+
+    function selectTask(id) {
+      selected = id;
+      syncURL();
+      render();
+    }
+
+    function render() {
+      const c = counts();
+      $("nav").innerHTML = FILTERS.map(([id, label]) => `
+        <button class="nav-item ${filter === id ? "on" : ""}" data-filter="${id}" type="button">
+          <span>${statusDot(id)}${label}</span><span class="count">${c[id] || 0}</span>
+        </button>`).join("");
+      $("nav").querySelectorAll("[data-filter]").forEach((el) => {
+        el.addEventListener("click", () => {
+          filter = el.dataset.filter;
+          $("view-title").textContent = FILTERS.find((f) => f[0] === filter)?.[1] || "Issues";
+          render();
+        });
+      });
+      $("list").innerHTML = view === "board" ? boardHTML() : listHTML();
+      bindList();
+      const t = state.tasks.find((x) => x.id === selected);
+      $("app").classList.toggle("blank", view !== "board" && !t);
+      $("app").classList.toggle("is-board", view === "board");
+      $("sheet").hidden = !t;
+      $("sheet").innerHTML = t ? formHTML(t) : "";
+      if (t) bindForm(t);
+    }
+
+    function listHTML() {
+      const rows = visible();
+      if (!rows.length) return '<div class="empty">No issues.</div>';
+      return rows.map((t) => `
+        <div class="row ${t.id === selected ? "on" : ""}" data-id="${t.id}">
+          ${statusMark(t)}
+          <span class="tid">${t.id.replace("TASK-", "")}</span>
+          <span class="title">${esc(t.title)}</span>
+          ${t.milestone ? `<span class="chip">${esc(milestoneTitle(t.milestone))}</span>` : "<span></span>"}
+          ${priMark(t.priority)}
+        </div>`).join("");
+    }
+
+    function boardHTML() {
+      const cols = filter !== "all" && filter !== "blocked" ? [filter] : COLUMNS;
+      return `<div class="board">${cols.map((status) => {
+        const cards = visible().filter((t) => t.status === status);
+        return `<section class="col" data-status="${esc(status)}">
+          <div class="col-head">${statusMark({ status })}${esc(status === "To Do" ? "Todo" : status)}<span class="count">${cards.length}</span></div>
+          <div class="col-body">${cards.map((t) => `
+            <article class="card ${t.id === selected ? "on" : ""}" data-id="${t.id}" draggable="true">
+              <div class="card-title">${esc(t.title)}</div>
+              <div class="card-meta">
+                <span class="tid">${t.id.replace("TASK-", "")}</span>
+                ${t.blocked_reason ? '<span class="chip" style="color:var(--blocked);border-color:#5a2e2e">Blocked</span>' : ""}
+                ${t.milestone ? `<span class="chip">${esc(milestoneTitle(t.milestone))}</span>` : ""}
+                <span style="margin-left:auto">${priMark(t.priority)}</span>
+              </div>
+            </article>`).join("")}</div>
+          ${addCol === status
+            ? `<form class="composer open" data-status="${esc(status)}" style="border:0;background:transparent;padding:0 8px 8px"><input name="title" placeholder="Issue title" required autocomplete="off"><button class="new" type="submit" style="width:auto;margin:0;padding:0 10px">Add</button></form>`
+            : `<button class="add-col" type="button" data-add="${esc(status)}">+ Add</button>`}
+        </section>`;
+      }).join("")}</div>`;
+    }
+
+    function bindList() {
+      $("list").querySelectorAll(".row, .card").forEach((el) => {
+        el.addEventListener("click", () => selectTask(el.dataset.id));
+      });
+      $("list").querySelectorAll("[data-add]").forEach((el) => {
+        el.addEventListener("click", () => { addCol = el.dataset.add; render(); });
+      });
+      $("list").querySelectorAll(".composer").forEach((form) => {
+        const input = form.querySelector("input");
+        if (input) input.focus();
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const title = new FormData(form).get("title");
+          const created = await send("POST", "/api/tasks", { title, status: form.dataset.status });
+          addCol = "";
+          selectTask(created.id);
+          await load();
+        });
+      });
+      $("list").querySelectorAll(".card").forEach((el) => {
+        el.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", el.dataset.id);
+          e.dataTransfer.effectAllowed = "move";
+        });
+      });
+      $("list").querySelectorAll(".col").forEach((col) => {
+        col.addEventListener("dragover", (e) => { e.preventDefault(); col.classList.add("over"); });
+        col.addEventListener("dragleave", () => col.classList.remove("over"));
+        col.addEventListener("drop", async (e) => {
+          e.preventDefault();
+          col.classList.remove("over");
+          const id = e.dataTransfer.getData("text/plain");
+          const status = col.dataset.status;
+          const task = state.tasks.find((t) => t.id === id);
+          if (!id || !task || task.status === status) return;
+          await send("PATCH", "/api/tasks/" + encodeURIComponent(id), { status });
+          await load();
+        });
+      });
+    }
+
+    function statusDot(id) {
+      const fake = {
+        all: { status: "To Do" },
+        "To Do": { status: "To Do" },
+        "In Progress": { status: "In Progress" },
+        Done: { status: "Done" },
+        Draft: { status: "Draft" },
+        blocked: { status: "To Do", blocked_reason: "x" },
+      }[id];
+      return statusMark(fake || { status: "To Do" });
+    }
+
+    function formHTML(t) {
+      const ms = (state.milestones || []).map((m) =>
+        `<option value="${esc(m.id)}" ${m.id === t.milestone ? "selected" : ""}>${esc(m.title)}</option>`
+      ).join("");
+      return `
+        <form class="issue" id="edit">
+          <div class="issue-id">${esc(t.id)}</div>
+          <textarea class="title-edit" name="title" rows="2" required>${esc(t.title)}</textarea>
+          <div class="props">
+            <label class="prop"><span>Status</span>
+              <select name="status">${opt(t.status, ["To Do","In Progress","Done","Draft"])}</select>
+            </label>
+            <label class="prop"><span>Priority</span>
+              <select name="priority">${opt(t.priority || "", ["","high","medium","low"])}</select>
+            </label>
+            <label class="prop"><span>Milestone</span>
+              <select name="milestone"><option value="">No milestone</option>${ms}</select>
+            </label>
+            <label class="prop"><span>Blocked</span>
+              <input class="blocked-edit" name="blocked_reason" value="${esc(t.blocked_reason || "")}" placeholder="Add reason">
+            </label>
+          </div>
+          <textarea class="notes" name="notes" placeholder="Add description…">${esc(t.notes || "")}</textarea>
+          <div id="err" class="err"></div>
+          <div class="actions">
+            <button type="button" class="ghost" data-act="complete">Mark as done</button>
+            <button type="button" class="danger" data-act="archive">Archive</button>
+          </div>
+        </form>`;
+    }
+
+    function opt(cur, vals) {
+      const labels = { "": "No priority", high: "High", medium: "Medium", low: "Low" };
+      return vals.map((v) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${labels[v] || v}</option>`).join("");
+    }
+
+    async function saveForm(form, id) {
+      const fd = new FormData(form);
+      await send("PATCH", "/api/tasks/" + encodeURIComponent(id), Object.fromEntries(fd.entries()));
+      await load();
+    }
+
+    function bindForm(t) {
+      const form = $("edit");
+      const err = $("err");
+      const fail = (ex) => { err.textContent = String(ex.message || ex); };
+      form.querySelectorAll("select").forEach((el) => {
+        el.addEventListener("change", () => saveForm(form, t.id).catch(fail));
+      });
+      form.querySelectorAll("textarea, .blocked-edit").forEach((el) => {
+        el.addEventListener("blur", () => saveForm(form, t.id).catch(fail));
+      });
+      form.querySelectorAll("[data-act]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            await send("POST", "/api/tasks/" + encodeURIComponent(t.id) + "/" + btn.dataset.act, {});
+            if (btn.dataset.act === "archive") selected = "";
+            await load();
+          } catch (ex) { fail(ex); }
+        });
+      });
+    }
+
+    $("new").addEventListener("click", () => {
+      $("composer").classList.add("open");
+      $("composer").querySelector("input").focus();
+    });
+    $("q").addEventListener("input", (e) => { query = e.target.value.trim().toLowerCase(); render(); });
+    $("composer").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = new FormData(e.target).get("title");
+      const created = await send("POST", "/api/tasks", { title });
+      e.target.reset();
+      $("composer").classList.remove("open");
+      addCol = "";
+      selectTask(created.id);
+      await load();
+    });
+    $("view-list").addEventListener("click", () => setView("list"));
+    $("view-board").addEventListener("click", () => setView("board"));
+    if (view === "board") {
+      $("view-list").classList.remove("on");
+      $("view-board").classList.add("on");
+      $("app").classList.add("is-board");
+    }
+
+    async function send(method, url, body) {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || res.statusText);
+      return text ? JSON.parse(text) : {};
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    load().catch((err) => { $("list").innerHTML = '<div class="err">' + esc(err) + "</div>"; });
+  </script>
+</body>
+</html>
