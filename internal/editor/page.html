@@ -43,7 +43,7 @@
       height: 100%;
       min-height: 0;
     }
-    .app.no-sheet, .app.is-board, .app.is-dag, .app.is-gantt, .app.is-json {
+    .app.no-sheet, .app.is-board, .app.is-dag, .app.is-gantt, .app.is-qa, .app.is-json {
       grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
     }
     aside {
@@ -197,7 +197,7 @@
     .toolbar input:focus { outline: 1px solid #3d4260; }
     .list { overflow: auto; flex: 1; min-height: 0; }
     .list:has(.board) { overflow: hidden; display: flex; }
-    .list:has(.dag-wrap), .list:has(.gantt-wrap), .list:has(.json-wrap) { overflow: auto; display: block; }
+    .list:has(.dag-wrap), .list:has(.gantt-wrap), .list:has(.qa-wrap), .list:has(.json-wrap) { overflow: auto; display: block; }
     .stats {
       flex: none;
       padding: 12px 8px 4px;
@@ -240,6 +240,23 @@
       font-variant-numeric: tabular-nums;
     }
     .stats-row .bad { color: var(--blocked); }
+    .stats-score {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin: 0 0 10px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+    }
+    .stats-score b {
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+    .stats-score.ok b { color: #3fa68a; }
+    .stats-score.mid b { color: var(--progress); }
+    .stats-score.bad b { color: var(--blocked); }
     .stats-size {
       display: grid;
       gap: 3px;
@@ -488,7 +505,7 @@
       cursor: pointer;
     }
     .add-col:hover { color: var(--text); }
-    .app.is-board .sheet, .app.is-dag .sheet, .app.is-gantt .sheet, .app.is-json .sheet {
+    .app.is-board .sheet, .app.is-dag .sheet, .app.is-gantt .sheet, .app.is-qa .sheet, .app.is-json .sheet {
       position: fixed;
       top: 0;
       right: 0;
@@ -722,6 +739,36 @@
     .gantt-bar.tone-VALIDATION { background: #3fa68a; }
     .gantt-bar.done { opacity: 0.38; }
     .gantt-row.on .gantt-bar { box-shadow: 0 0 0 1px #fff; }
+    #gantt-tip {
+      position: fixed;
+      z-index: 50;
+      width: min(360px, calc(100vw - 24px));
+      max-height: min(420px, calc(100vh - 24px));
+      overflow: auto;
+      padding: 11px 13px 12px;
+      background: #121314;
+      border: 1px solid var(--line);
+      border-left-width: 3px;
+      border-radius: 8px;
+      box-shadow: 0 18px 44px rgba(0,0,0,0.58);
+      pointer-events: none;
+    }
+    #gantt-tip[hidden], #gantt-tip:empty { display: none !important; }
+    #gantt-tip.tone-GOAL { border-left-color: var(--accent); }
+    #gantt-tip.tone-PLAN { border-left-color: #8b93e8; }
+    #gantt-tip.tone-TASK { border-left-color: var(--faint); }
+    #gantt-tip.tone-GUARD { border-left-color: var(--blocked); }
+    #gantt-tip.tone-TEST { border-left-color: var(--progress); }
+    #gantt-tip.tone-VALIDATION { border-left-color: #3fa68a; }
+    .gantt-tip-id { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .gantt-tip-ttl { margin: 5px 0 9px; font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+    .gantt-tip-kv { margin: 0; }
+    .gantt-tip-kv div { display: grid; grid-template-columns: 78px 1fr; gap: 2px 10px; margin: 0 0 4px; }
+    .gantt-tip-kv dt { color: var(--faint); font-size: 11px; }
+    .gantt-tip-kv dd { margin: 0; color: var(--text); font-size: 12px; }
+    .gantt-tip-notes { margin: 9px 0 0; color: #d0d6e0; font-size: 12.5px; line-height: 1.45; }
+    .gantt-tip-req { margin: 8px 0 0; padding: 0 0 0 16px; color: var(--mute); font-size: 12px; }
+    .gantt-tip-req li { margin: 0 0 3px; }
     .gantt-today {
       position: absolute;
       top: 0;
@@ -805,14 +852,75 @@
     .json-card.tone-TEST { border-left-color: var(--progress); }
     .json-card.tone-VALIDATION { border-left-color: #3fa68a; }
     .json-card .jk { color: #8b93e8; }
+    .qa-wrap { padding: 10px 14px 28px; }
+    .qa-hero {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin: 0 0 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .qa-hero b {
+      font-size: 42px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .qa-hero.ok b { color: #3fa68a; }
+    .qa-hero.mid b { color: var(--progress); }
+    .qa-hero.bad b { color: var(--blocked); }
+    .qa-hero span { color: var(--faint); font-size: 13px; }
+    .qa-note { margin: 0 0 14px; color: var(--mute); font-size: 12px; }
+    .qa-counts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 16px;
+    }
+    .qa-counts span {
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--mute);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+    .qa-counts b { color: var(--text); font-weight: 600; }
+    .qa-hit {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 8px 12px;
+      margin: 0 0 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--elev);
+    }
+    .qa-hit .pts { color: var(--blocked); font-variant-numeric: tabular-nums; font-weight: 600; }
+    .qa-hit .code { color: var(--text); font-size: 12px; font-weight: 500; }
+    .qa-hit .msg { color: var(--mute); font-size: 12px; margin: 3px 0 6px; }
+    .qa-ids { display: flex; flex-wrap: wrap; gap: 6px; }
+    .qa-id {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+    .qa-id:hover, .qa-id.on { background: var(--active); border-color: var(--accent); }
+    .qa-ok { color: #3fa68a; font-size: 13px; }
     @media (max-width: 1100px) {
       .app { grid-template-columns: minmax(160px, 200px) minmax(0, 1fr) minmax(240px, 34vw); }
-      .app.is-board .sheet, .app.is-dag .sheet, .app.is-gantt .sheet, .app.is-json .sheet {
+      .app.is-board .sheet, .app.is-dag .sheet, .app.is-gantt .sheet, .app.is-qa .sheet, .app.is-json .sheet {
         width: min(360px, 48vw);
       }
     }
     @media (max-width: 860px) {
-      .app, .app.no-sheet, .app.is-board, .app.is-dag, .app.is-gantt, .app.is-json {
+      .app, .app.no-sheet, .app.is-board, .app.is-dag, .app.is-gantt, .app.is-qa, .app.is-json {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: auto minmax(0, 1fr) auto;
       }
@@ -827,7 +935,7 @@
         border-top: 1px solid var(--line);
         max-height: 44vh;
       }
-      .app.is-board .sheet, .app.is-dag .sheet, .app.is-gantt .sheet, .app.is-json .sheet {
+      .app.is-board .sheet, .app.is-dag .sheet, .app.is-gantt .sheet, .app.is-qa .sheet, .app.is-json .sheet {
         position: static;
         width: 100%;
         max-height: 44vh;
@@ -869,6 +977,9 @@
           <button type="button" id="view-gantt" title="Gantt" aria-label="Gantt view">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="2.2" width="8" height="2" rx=".4"/><rect x="3" y="6" width="10" height="2" rx=".4"/><rect x="2" y="9.8" width="6" height="2" rx=".4"/></svg>
           </button>
+          <button type="button" id="view-qa" title="Plan QA" aria-label="Plan QA view">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.4" y="1.6" width="9.2" height="10.8" rx="1.4"/><path d="M4.6 7.2l1.7 1.7 3.2-3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
           <button type="button" id="view-json" title="JSON" aria-label="JSON view">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 2.4c-1.6 0-2.1 1.3-2.1 2.2 0 1.1-.7 1.4-.7 2.4s.7 1.3.7 2.4c0 .9.5 2.2 2.1 2.2M9 2.4c1.6 0 2.1 1.3 2.1 2.2 0 1.1.7 1.4.7 2.4s-.7 1.3-.7 2.4c0 .9-.5 2.2-2.1 2.2"/></svg>
           </button>
@@ -880,7 +991,7 @@
         <span class="poll" id="poll" role="meter" aria-valuemin="0" aria-valuemax="1" aria-valuenow="1" title="Time until next pack check" aria-label="Time until next pack check">
           <span class="poll-pie" id="poll-pie"></span>
         </span>
-        <input id="q" type="search" placeholder="Search" autocomplete="off">
+        <input id="q" type="search" placeholder="Search any field" autocomplete="off">
       </div>
       <form class="composer" id="composer">
         <input name="title" placeholder="Issue title" autocomplete="off" required>
@@ -894,6 +1005,7 @@
     </main>
     <section class="sheet" id="sheet" hidden></section>
   </div>
+  <div id="gantt-tip" hidden role="tooltip"></div>
   <script>
     const $ = (id) => document.getElementById(id);
     const FILTERS = [
@@ -908,7 +1020,7 @@
     const params = new URLSearchParams(location.search);
     let state = { tasks: [], milestones: [], project: {}, tool: {} };
     let selected = params.get("id") || "";
-    let view = ["board", "dag", "gantt", "json"].includes(params.get("view")) ? params.get("view") : "list";
+    let view = ["board", "dag", "gantt", "qa", "json"].includes(params.get("view")) ? params.get("view") : "list";
     let filter = "all";
     let query = "";
     let addCol = "";
@@ -1022,12 +1134,19 @@
 
     function statsHTML() {
       const s = packStats();
+      const sc = state.score || {};
+      const n = Number(sc.score);
+      const max = Number(sc.max) || 100;
+      const tone = n >= 100 ? "ok" : n >= 50 ? "mid" : "bad";
       const types = ["GOAL", "PLAN", "TASK", "GUARD", "TEST", "VALIDATION"].map((k) =>
         `<span class="stats-type tone-${k}"><b>${s.types[k] || 0}</b>${k}</span>`
       ).join("");
       const bit = (n, label, bad) => n ? `<span class="${bad ? "bad" : ""}">${n} ${label}</span>` : "";
       const guarded = s.goals ? `<span class="${s.unguarded ? "bad" : ""}">${s.goals - s.unguarded}/${s.goals} goals guarded</span>` : "";
-      return `<div class="stats-size" title="Token estimate is bytes / 4">
+      return `<div class="stats-score ${Number.isFinite(n) ? tone : ""}" title="Deterministic plan shape. Not meaning.">
+          <b>${Number.isFinite(n) ? n : "—"}</b><span>/${max} plan</span>
+        </div>
+        <div class="stats-size" title="Token estimate is bytes / 4">
           <div><span>prim</span><b>${fmtBytes(s.primBytes)}</b><em>${fmtTok(s.primBytes)}</em></div>
           <div><span>jsonl</span><b>${fmtBytes(s.jsonlBytes)}</b><em>${fmtTok(s.jsonlBytes)}</em></div>
         </div>
@@ -1046,11 +1165,15 @@
         </div>`;
     }
 
+    function cardBlob(t) {
+      try { return JSON.stringify(t).toLowerCase(); } catch (_) { return ""; }
+    }
+
     function visible() {
       return state.tasks.filter((t) => {
         if (filter === "blocked" && !t.blocked_reason) return false;
         if (filter !== "all" && filter !== "blocked" && t.status !== filter) return false;
-        if (query && !`${t.id} ${t.uid} ${t.title} ${t.notes} ${t.type} ${(t.requirements||[]).join(" ")} ${(t["test-cases"]||[]).join(" ")} ${(t["acceptance-criteria"]||[]).join(" ")}`.toLowerCase().includes(query)) return false;
+        if (query && !cardBlob(t).includes(query)) return false;
         return true;
       });
     }
@@ -1369,10 +1492,12 @@
       $("view-board").classList.toggle("on", view === "board");
       $("view-dag").classList.toggle("on", view === "dag");
       $("view-gantt").classList.toggle("on", view === "gantt");
+      $("view-qa").classList.toggle("on", view === "qa");
       $("view-json").classList.toggle("on", view === "json");
       $("app").classList.toggle("is-board", view === "board");
       $("app").classList.toggle("is-dag", view === "dag");
       $("app").classList.toggle("is-gantt", view === "gantt");
+      $("app").classList.toggle("is-qa", view === "qa");
       $("app").classList.toggle("is-json", view === "json");
       const play = $("dag-play");
       const meta = $("dag-play-meta");
@@ -1401,6 +1526,7 @@
     }
 
     function render() {
+      hideGanttTip();
       const c = counts();
       $("nav").innerHTML = FILTERS.map(([id, label]) => `
         <button class="nav-item ${filter === id ? "on" : ""}" data-filter="${id}" type="button">
@@ -1413,7 +1539,7 @@
           render();
         });
       });
-      $("list").innerHTML = view === "board" ? boardHTML() : view === "dag" ? dagHTML() : view === "gantt" ? ganttHTML() : view === "json" ? jsonHTML() : listHTML();
+      $("list").innerHTML = view === "board" ? boardHTML() : view === "dag" ? dagHTML() : view === "gantt" ? ganttHTML() : view === "qa" ? qaHTML() : view === "json" ? jsonHTML() : listHTML();
       bindList();
       $("stats").innerHTML = statsHTML();
       const t = state.tasks.find((x) => x.id === selected);
@@ -1578,13 +1704,16 @@
         const label = g.shift && i === 0 ? "Gov" : "L" + (i - g.shift + 1);
         return `<span class="gantt-tick" style="left:${((i + 0.02) / g.n * 100).toFixed(3)}%">${esc(label)}</span>`;
       }).join("");
+      const tick = (i) => g.shift && i === 0 ? "Gov" : "L" + (i - g.shift + 1);
       const rowHTML = (t, depth) => {
         const col = g.colOf(t);
         const span = g.spanOf(t);
         const left = (col / g.n * 100).toFixed(3);
         const width = (span / g.n * 100).toFixed(3);
         const done = t.status === "Done" ? " done" : "";
-        return `<div class="gantt-row ${t.id === selected ? "on" : ""}" data-id="${t.id}" style="--d:${depth || 0}">
+        const from = tick(col);
+        const rank = span > 1 ? from + "–" + tick(col + span - 1) : from;
+        return `<div class="gantt-row ${t.id === selected ? "on" : ""}" data-id="${t.id}" data-rank="${esc(rank)}" style="--d:${depth || 0}">
           <div class="gantt-label">${statusMark(t)}<span class="tid">${t.id.replace("TASK-", "")}</span><span class="ttl">${esc(t.title)}</span></div>
           <div class="gantt-track">
             <span class="gantt-bar tone-${esc(t.type || "TASK")}${done}" style="left:${left}%;width:calc(${width}% - 6px)"></span>
@@ -1600,7 +1729,7 @@
         </section>`;
       };
       return `<div class="gantt-wrap">
-        <div class="gantt-legend"><span><i></i>rank</span><span><i class="span"></i>parent spans children</span></div>
+        <div class="gantt-legend"><span><i></i>rank</span><span><i class="span"></i>parent spans children</span><span>hover a row for the card</span></div>
         <div class="gantt-head">
           <span class="gantt-corner">Rank</span>
           <div class="gantt-ticks">${head}</div>
@@ -1611,6 +1740,110 @@
           ${sec("loose", "No parent", parts.loose)}
         </div>
       </div>`;
+    }
+
+    function qaHTML() {
+      const sc = state.score || { score: 0, max: 100, deductions: [], counts: {} };
+      const n = Number(sc.score);
+      const max = Number(sc.max) || 100;
+      const tone = n >= 100 ? "ok" : n >= 50 ? "mid" : "bad";
+      const vis = new Set(visible().map((t) => t.id));
+      const c = sc.counts || {};
+      const counts = [
+        ["GOAL", c.goals], ["PLAN", c.plans], ["TASK", c.tasks],
+        ["GUARD", c.guards], ["TEST", c.tests], ["VALIDATION", c.validations],
+        ["MS", c.milestones],
+      ].map(([k, v]) => `<span><b>${v || 0}</b> ${k}</span>`).join("");
+      const hits = (sc.deductions || []).filter((d) => {
+        if (!query) return true;
+        const blob = `${d.code} ${d.msg} ${(d.ids || []).join(" ")}`.toLowerCase();
+        return blob.includes(query) || (d.ids || []).some((id) => vis.has(id));
+      });
+      const body = hits.map((d) => {
+        const ids = (d.ids || []).map((id) =>
+          `<button type="button" class="qa-id ${id === selected ? "on" : ""}" data-id="${esc(id)}">${esc(id.replace("TASK-", ""))}</button>`
+        ).join("");
+        const extra = d.count > 1 ? ` ×${d.count}` : "";
+        return `<div class="qa-hit">
+          <div class="pts">−${d.points}</div>
+          <div>
+            <div class="code">${esc(d.code)}${extra}</div>
+            <div class="msg">${esc(d.msg)}</div>
+            ${ids ? `<div class="qa-ids">${ids}</div>` : ""}
+          </div>
+        </div>`;
+      }).join("");
+      const clean = !hits.length && n >= 100 ? '<div class="qa-ok">Graph is clean. Hollow notes still go through validate.</div>' : (body || '<div class="empty">No matching deductions.</div>');
+      return `<div class="qa-wrap">
+        <div class="qa-hero ${tone}"><b>${Number.isFinite(n) ? n : "—"}</b><span>/${max} plan</span></div>
+        <p class="qa-note">Quantitative graph bar. Same number as docket-prim score. Not meaning.</p>
+        <div class="qa-counts">${counts}</div>
+        ${clean}
+      </div>`;
+    }
+
+    function clipText(s, n) {
+      s = String(s || "").trim();
+      if (s.length <= n) return s;
+      const cut = s.slice(0, n);
+      const sp = cut.lastIndexOf(" ");
+      return (sp > 80 ? cut.slice(0, sp) : cut) + "…";
+    }
+    function nameOf(id) {
+      const x = state.tasks.find((r) => r.id === id);
+      return x ? x.id.replace("TASK-", "") + "  " + x.title : id;
+    }
+    function ganttTipHTML(t, rank) {
+      const typ = t.type || "TASK";
+      const req = (t.requirements || []).filter(Boolean);
+      const cases = (t["test-cases"] || []).filter(Boolean);
+      const acc = (t["acceptance-criteria"] || []).filter(Boolean);
+      const deps = (t.dependencies || []).filter(Boolean);
+      const parentNoun = typ === "GUARD" ? "Constrains" : typ === "VALIDATION" ? "Closes" : typ === "TEST" ? "Proves" : "Parent";
+      const kv = [["Rank", rank || "—"], [parentNoun, t.parent ? nameOf(t.parent) : "none"]];
+      if (t.milestone) kv.push(["Milestone", t.milestone]);
+      if (deps.length) kv.push(["Depends", deps.map(nameOf).join(", ")]);
+      if (t.start || t.due) kv.push(["Dates", (t.start || "—") + " → " + (t.due || "—")]);
+      if (t.blocked_reason) kv.push(["Blocked", t.blocked_reason]);
+      kv.push(["Body", req.length + " req · " + cases.length + " tests · " + acc.length + " accept"]);
+      const notes = clipText(t.notes, 280);
+      const reqLis = req.slice(0, 2).map((r) => `<li>${esc(clipText(r, 120))}</li>`).join("");
+      return `<div class="gantt-tip-id">${esc(t.id)} · ${esc(typ)} · ${esc(t.status || "")}${t.priority ? " · " + esc(t.priority) : ""}</div>
+        <div class="gantt-tip-ttl">${esc(t.title)}</div>
+        <dl class="gantt-tip-kv">${kv.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>
+        ${notes ? `<p class="gantt-tip-notes">${esc(notes)}</p>` : ""}
+        ${reqLis ? `<ul class="gantt-tip-req">${reqLis}</ul>` : ""}`;
+    }
+    function hideGanttTip() {
+      const tip = $("gantt-tip");
+      if (!tip) return;
+      tip.hidden = true;
+      tip.innerHTML = "";
+      tip.className = "";
+      tip.style.left = "";
+      tip.style.top = "";
+    }
+    function placeGanttTip(e) {
+      const tip = $("gantt-tip");
+      if (!tip || tip.hidden) return;
+      const pad = 12;
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      let x = e.clientX + 14, y = e.clientY + 16;
+      if (x + w > innerWidth - pad) x = e.clientX - w - 10;
+      if (y + h > innerHeight - pad) y = e.clientY - h - 10;
+      if (x < pad) x = pad;
+      if (y < pad) y = pad;
+      tip.style.left = x + "px";
+      tip.style.top = y + "px";
+    }
+    function showGanttTip(el, e) {
+      const t = state.tasks.find((x) => x.id === el.dataset.id);
+      const tip = $("gantt-tip");
+      if (!t || !tip) return;
+      tip.className = "tone-" + (t.type || "TASK");
+      tip.innerHTML = ganttTipHTML(t, el.dataset.rank || "");
+      tip.hidden = false;
+      placeGanttTip(e);
     }
 
     const JSON_KEYS = ["id","uid","title","type","status","priority","milestone","parent","subtasks","assignees","tags","dependencies","requirements","test-cases","acceptance-criteria","definition-of-done","blocked_reason","created","updated","start","due","notes"];
@@ -1672,11 +1905,16 @@
     }
 
     function bindList() {
-      $("list").querySelectorAll(".row, .card, .dag-node, .gantt-row, .json-card").forEach((el) => {
+      $("list").querySelectorAll(".row, .card, .dag-node, .gantt-row, .json-card, .qa-id").forEach((el) => {
         el.addEventListener("click", () => {
           if (el.dataset.id === selected) closeSheet();
           else selectTask(el.dataset.id);
         });
+      });
+      $("list").querySelectorAll(".gantt-row").forEach((el) => {
+        el.addEventListener("mouseenter", (e) => showGanttTip(el, e));
+        el.addEventListener("mousemove", placeGanttTip);
+        el.addEventListener("mouseleave", hideGanttTip);
       });
       $("list").querySelectorAll("[data-add]").forEach((el) => {
         el.addEventListener("click", () => { addCol = el.dataset.add; render(); });
@@ -1893,6 +2131,7 @@
     $("view-board").addEventListener("click", () => setView("board"));
     $("view-dag").addEventListener("click", () => setView("dag"));
     $("view-gantt").addEventListener("click", () => setView("gantt"));
+    $("view-qa").addEventListener("click", () => setView("qa"));
     $("view-json").addEventListener("click", () => setView("json"));
     $("dag-play").addEventListener("click", startDagPlay);
     let resizeFrame = 0;
@@ -1901,8 +2140,13 @@
       if (resizeFrame) cancelAnimationFrame(resizeFrame);
       resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; render(); });
     });
+    $("list").addEventListener("scroll", hideGanttTip, { passive: true });
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
+      if ($("gantt-tip") && !$("gantt-tip").hidden) {
+        hideGanttTip();
+        return;
+      }
       if (dagPlay.timer) {
         stopDagPlay();
         return;

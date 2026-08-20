@@ -31,6 +31,8 @@ docket-prim task-create --title "Ship login" --priority high
 docket-prim task-list
 docket-prim task-edit TASK-0001 --status "In Progress"
 docket-prim task-complete TASK-0001
+docket-prim score --json
+docket-prim lift --dry-run --json
 docket-prim info --json
 ```
 

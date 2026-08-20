@@ -111,6 +111,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		"dir":        p.Dir,
 		"rev":        docket.Rev(p.Dir),
 		"size":       docket.SizeOf(p.Dir),
+		"score":      docket.ScoreOf(p),
 		"project":    p.Project,
 		"tasks":      p.Tasks,
 		"milestones": p.Milestones,

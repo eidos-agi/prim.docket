@@ -314,3 +314,44 @@ func TestSizeOfCountsPackFiles(t *testing.T) {
 	}
 }
 
+func TestSearchHitsEveryCardField(t *testing.T) {
+	dir := t.TempDir()
+	p, err := Init(dir, "Fixture", "fix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := p.CreateTask(live("Parent outcome named here"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	child := live("Child work named here")
+	child.Parent = parent.ID
+	child.Tags = []string{"zxqv-unique-tag"}
+	child.BlockedReason = "waiting-on-zxqv-token"
+	child.Start = "2026-03-14"
+	child.Assignees = []string{"zxqv-assignee"}
+	got, err := p.CreateTask(child)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"zxqv-unique-tag", "waiting-on-zxqv-token", "2026-03-14", "zxqv-assignee"} {
+		hits := p.Search(q)
+		if len(hits) != 1 || hits[0].ID != got.ID {
+			t.Fatalf("search %q got %+v", q, hits)
+		}
+	}
+	hits := p.Search(parent.ID)
+	saw := false
+	for _, h := range hits {
+		if h.ID == got.ID {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Fatalf("parent id search missed child: %+v", hits)
+	}
+	if hits := p.Search("Child work"); len(hits) != 1 {
+		t.Fatalf("title search %d", len(hits))
+	}
+}
+

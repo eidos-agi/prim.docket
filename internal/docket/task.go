@@ -1,6 +1,7 @@
 package docket
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -412,11 +413,17 @@ func (p *Pack) ArchiveTask(id string) (Task, error) {
 }
 
 func (p *Pack) Search(q string) []Task {
-	q = strings.ToLower(q)
+	q = strings.ToLower(strings.TrimSpace(q))
+	if q == "" {
+		return nil
+	}
 	var out []Task
 	for _, t := range p.Tasks {
-		blob := strings.ToLower(t.ID + " " + t.UID + " " + t.Title + " " + t.Notes + " " + t.BlockedReason + " " + strings.Join(t.Requirements, " ") + " " + strings.Join(t.TestCases, " ") + " " + strings.Join(t.Acceptance, " "))
-		if strings.Contains(blob, q) {
+		b, err := json.Marshal(t)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(strings.ToLower(string(b)), q) {
 			out = append(out, t)
 		}
 	}

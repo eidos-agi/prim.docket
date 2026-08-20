@@ -31,3 +31,15 @@
 - 2026-08-20 — completed TASK-0018
 - 2026-08-20 — created TASK-0019 DAG Gantt sections and responsive editor
 - 2026-08-20 — completed TASK-0019
+- 2026-08-20 — created TASK-0020 Gantt hover shows card intel
+- 2026-08-20 — edited TASK-0020
+- 2026-08-20 — created TASK-0021 Deterministic quantitative plan score
+- 2026-08-20 — edited TASK-0021
+- 2026-08-20 — created TASK-0022 Search matches every field on the card
+- 2026-08-20 — edited TASK-0022
+- 2026-08-20 — created TASK-0023 Editor Plan QA view between Gantt and JSON
+- 2026-08-20 — edited TASK-0023
+- 2026-08-20 — created TASK-0024 Gantt hover tip must fully hide on leave
+- 2026-08-20 — edited TASK-0024
+- 2026-08-20 — created TASK-0025 CLI lift raises plan score with nest-legal patches
+- 2026-08-20 — edited TASK-0025

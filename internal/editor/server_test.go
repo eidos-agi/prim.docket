@@ -59,6 +59,10 @@ func TestEditorCreatesAndEdits(t *testing.T) {
 	if tool["cites"] != "docket:fix" {
 		t.Fatalf("cites %v", tool["cites"])
 	}
+	sc, _ := state["score"].(map[string]any)
+	if sc["kind"] != "plan" {
+		t.Fatalf("score %+v", state["score"])
+	}
 	if res, err := http.Get(ts.URL + "/"); err != nil || res.StatusCode != 200 {
 		t.Fatalf("page %v %v", err, res)
 	} else {
@@ -99,11 +103,27 @@ func TestEditorCreatesAndEdits(t *testing.T) {
 		if !bytes.Contains(buf.Bytes(), []byte(`id="view-gantt"`)) || !bytes.Contains(buf.Bytes(), []byte("function ganttHTML")) {
 			t.Fatal("page missing Gantt view")
 		}
+		qaAt, jsonAt := bytes.Index(buf.Bytes(), []byte(`id="view-qa"`)), bytes.Index(buf.Bytes(), []byte(`id="view-json"`))
+		if qaAt < 0 || jsonAt < 0 || qaAt > jsonAt {
+			t.Fatal("Plan QA must sit after Gantt and before JSON")
+		}
+		if !bytes.Contains(buf.Bytes(), []byte("function qaHTML")) || !bytes.Contains(buf.Bytes(), []byte("Plan QA")) {
+			t.Fatal("page missing Plan QA view")
+		}
 		if !bytes.Contains(buf.Bytes(), []byte("function ganttLayout")) || !bytes.Contains(buf.Bytes(), []byte(`gantt-corner">Rank`)) || !bytes.Contains(buf.Bytes(), []byte("gantt-ticks")) {
 			t.Fatal("page missing rank Gantt")
 		}
 		if bytes.Contains(buf.Bytes(), []byte("start → due")) {
 			t.Fatal("Gantt still keyed on calendar dates")
+		}
+		if !bytes.Contains(buf.Bytes(), []byte(`id="gantt-tip"`)) || !bytes.Contains(buf.Bytes(), []byte("function ganttTipHTML")) {
+			t.Fatal("page missing Gantt hover tip")
+		}
+		if !bytes.Contains(buf.Bytes(), []byte("#gantt-tip[hidden]")) || bytes.Contains(buf.Bytes(), []byte(`<aside id="gantt-tip"`)) {
+			t.Fatal("Gantt tip still inherits rail aside display:flex")
+		}
+		if !bytes.Contains(buf.Bytes(), []byte("data-rank=")) {
+			t.Fatal("page missing Gantt rank on hover rows")
 		}
 		if !bytes.Contains(buf.Bytes(), []byte(`id="view-json"`)) || !bytes.Contains(buf.Bytes(), []byte("function jsonHTML")) {
 			t.Fatal("page missing JSON view")
@@ -132,8 +152,8 @@ func TestEditorCreatesAndEdits(t *testing.T) {
 		if !bytes.Contains(buf.Bytes(), []byte(`id="stats"`)) || !bytes.Contains(buf.Bytes(), []byte("function packStats")) {
 			t.Fatal("page missing docket stats")
 		}
-		if !bytes.Contains(buf.Bytes(), []byte("function fmtBytes")) || !bytes.Contains(buf.Bytes(), []byte("function fmtTok")) || !bytes.Contains(buf.Bytes(), []byte("stats-size")) {
-			t.Fatal("page missing prim byte/token estimates")
+		if !bytes.Contains(buf.Bytes(), []byte("function cardBlob")) || !bytes.Contains(buf.Bytes(), []byte("Search any field")) {
+			t.Fatal("page missing whole-card search")
 		}
 		navAt, statsAt, listAt := bytes.Index(buf.Bytes(), []byte(`id="nav"`)), bytes.Index(buf.Bytes(), []byte(`id="stats"`)), bytes.Index(buf.Bytes(), []byte(`id="list"`))
 		if navAt < 0 || statsAt < navAt || statsAt > listAt {

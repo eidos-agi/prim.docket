@@ -28,6 +28,8 @@ Usage:
                    (or: docket-prim planner --json < PlanRequest.json)
   docket-prim info [--dir PATH] [--json]
   docket-prim validate [--dir PATH] [--json]
+  docket-prim score [--dir PATH] [--json]
+  docket-prim lift [--dir PATH] [--dry-run] [--json] [--guards] [--attach-guards ID] [--attach-loose ID]
   docket-prim review [--dir PATH] [--json]
   docket-prim task-create --title TEXT --notes TEXT --req TEXT [--req TEXT] --case TEXT [--case TEXT] --accept TEXT [--accept TEXT] ...
                           [--type TASK|GOAL|PLAN|GUARD|TEST|VALIDATION] [--status S] [--priority P] [--milestone ID]
@@ -132,6 +134,7 @@ func run(cmd string, args []string) error {
 				"kind":     "schema",
 				"dir":      p.Dir,
 				"findings": fs,
+				"score":    docket.ScoreOf(p),
 			}, true); err != nil {
 				return err
 			}
@@ -145,6 +148,69 @@ func run(cmd string, args []string) error {
 		}
 		fmt.Println("ok")
 		return nil
+	case "score":
+		p, err := docket.Open(f.dir)
+		if err != nil {
+			return err
+		}
+		s := docket.ScoreOf(p)
+		if f.json {
+			if err := emit(s, true); err != nil {
+				return err
+			}
+			if !s.OK {
+				return fmt.Errorf("plan score %d/%d", s.Score, s.Max)
+			}
+			return nil
+		}
+		fmt.Println(s.Line())
+		for _, d := range s.Deductions {
+			extra := ""
+			if d.Count > 1 {
+				extra = fmt.Sprintf("  ×%d", d.Count)
+			}
+			fmt.Printf("  -%d  %s  %s%s\n", d.Points, d.Code, d.Msg, extra)
+		}
+		if !s.OK {
+			return fmt.Errorf("plan score %d/%d", s.Score, s.Max)
+		}
+		return nil
+	case "lift":
+		p, err := docket.Open(f.dir)
+		if err != nil {
+			return err
+		}
+		got, err := docket.Lift(p, docket.LiftOpts{
+			Guards:       f.guards,
+			AttachGuards: f.attachGuards,
+			AttachLoose:  f.attachLoose,
+		}, f.dryRun)
+		if err != nil {
+			return err
+		}
+		if f.json {
+			return emit(got, true)
+		}
+		fmt.Println(got.Line())
+		for _, op := range got.Ops {
+			switch op.Op {
+			case "create":
+				fmt.Printf("  create  %s  %s  parent %s  (%s)\n", op.Type, op.Title, op.Parent, op.Reason)
+			case "edit":
+				what := op.Parent
+				if op.Milestone != "" {
+					what = op.Milestone
+				}
+				fmt.Printf("  edit    %s  %s  (%s)\n", op.ID, what, op.Reason)
+			}
+		}
+		if !got.After.OK {
+			fmt.Println("remaining")
+			for _, d := range got.After.Deductions {
+				fmt.Printf("  -%d  %s  %s\n", d.Points, d.Code, d.Msg)
+			}
+		}
+		return nil
 	case "review":
 		p, err := docket.Open(f.dir)
 		if err != nil {
@@ -153,11 +219,11 @@ func run(cmd string, args []string) error {
 		doc := docket.ReviewDoc(p)
 		if f.json {
 			return emit(map[string]any{
-				"kind":            "qualitative",
-				"dir":             p.Dir,
-				"follow_ups":      docket.FollowUps,
-				"question_count":  docket.ReviewQuestionCount(),
-				"prompt":          doc,
+				"kind":           "qualitative",
+				"dir":            p.Dir,
+				"follow_ups":     docket.FollowUps,
+				"question_count": docket.ReviewQuestionCount(),
+				"prompt":         doc,
 			}, true)
 		}
 		fmt.Print(doc)
@@ -325,7 +391,8 @@ type flags struct {
 	tags, assignees, due, start, query                                                       string
 	req, cases, accept                                                                       []string
 	port                                                                                     int
-	json                                                                                     bool
+	json, dryRun, guards                                                                     bool
+	attachGuards, attachLoose                                                                string
 	setTitle, setType, setStatus, setPriority, setMilestone, setNotes, setBlocked, setParent bool
 	setReq, setCases, setAccept, setStart, setDue                                            bool
 	rest                                                                                     []string
@@ -403,6 +470,14 @@ func parseFlags(args []string) *flags {
 			f.port = n
 		case "--json":
 			f.json = true
+		case "--dry-run":
+			f.dryRun = true
+		case "--guards":
+			f.guards = true
+		case "--attach-guards":
+			f.attachGuards = take()
+		case "--attach-loose":
+			f.attachLoose = take()
 		case "-h", "--help":
 			usage()
 			os.Exit(0)

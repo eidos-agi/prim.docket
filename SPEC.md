@@ -134,13 +134,17 @@ A later **connector** may cite the same prim. If it is not surface or connector,
 
 ## 6. Two bars after mint
 
-**Quantitative** — `docket-prim validate`. Machine. Collect-all schema findings: blank fields, too-short titles/notes/list lines, placeholders (`TODO`/`TBD`/`n/a`/…), bad types, nesting, dangling refs, duplicate titles/ids/uids, missing uids. This is the authoring-agent hollow-card check. A title is not a card. A 12-character requirement is not a requirement. JSON: `{ok, kind: schema, findings[]}`.
+**Quantitative (hollow)** — `docket-prim validate`. Machine. Collect-all schema findings: blank fields, too-short titles/notes/list lines, placeholders (`TODO`/`TBD`/`n/a`/…), bad types, nesting, dangling refs, duplicate titles/ids/uids, missing uids. This is the authoring-agent hollow-card check. A title is not a card. A 12-character requirement is not a requirement. JSON: `{ok, kind: schema, findings[], score}`.
+
+**Quantitative (graph)** — `docket-prim score`. Machine. Deterministic 0–100 plan score. Same pack, same number. No model. It counts what does not make sense as a plan: missing GOAL / PLAN / TASK / GUARD / TEST / VALIDATION, no milestones, unguarded GOALs, decomposing nodes with no VALIDATION close-out, TASKs with no TEST child, unparented leaves, loose work beside a GOAL, extra root GOALs, a flat tree (no parent edges), parent/dependency cycles, dangling refs, work untagged when milestones exist. Deduction weights are fixed in `internal/docket/score.go`. Hollow notes do **not** move this number — that is `validate`. JSON: `{score, max: 100, kind: plan, ok, deductions[], counts}`. The editor left rail shows `N/100 plan`. The **Plan QA** view (`?view=qa`) sits after Gantt and before JSON and lists the same score, counts, and clickable deduction ids.
+
+**Lift** — `docket-prim lift`. Machine. Raises the graph score with nest-legal patches written only by this binary: mint `VALIDATION` on decomposing parents, mint `TEST` under TASKs that have none, optionally mint `GUARD` on unguarded GOALs (`--guards`), optionally parent orphan GUARDs (`--attach-guards ID`) and loose PLAN/TASK/extra-root GOAL (`--attach-loose ID`). One milestone tags untagged work; many milestones stay untagged. `--dry-run` prints before → after and does not append jsonl. It does not invent a GOAL. Remaining deductions print after the ops.
 
 **Qualitative** — `docket-prim review`. Prints a ≥50-question prompt plus a pack digest for a **blind** agent (no planner context, no interview). Meaning, overlay vs parent, falsifiable tests, refuses, secrets — not length counts. The authoring agent must not answer this prompt itself.
 
 Protocol:
 
-1. `validate` clean, or the review is invalid.
+1. `validate` clean, or the review is invalid. `score` is the graph bar; it does not replace validate.
 2. Blind agent answers every question `Q<n> PASS|FAIL <id> — why`.
 3. Authoring agent fixes FAILs, re-runs validate then review.
 4. At most **two follow-up rounds** after the first review.
