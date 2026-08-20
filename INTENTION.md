@@ -2,7 +2,7 @@
 
 `docket-md` is for people who want markdown on disk — one `.md` file per task, readable without a tool.
 
-`docket-prim` is for people who want a Prim: one store both agents and humans open, views and boards as tools that cite it.
+`docket-prim` is for people who want one pack both a human and an agent can open: a local board, a score, a CLI, jsonl on disk.
 
 Do not convert a `.docket/` tree and call it a prim. That is still docket-md. The new format is the product.
 
