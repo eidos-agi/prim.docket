@@ -5,3 +5,25 @@
 - 2026-08-20 — filed planner bug #3: creates zero milestones.
 - 2026-08-20 — filed planner bug #4: no parent hierarchy (goal->milestone->task).
 - 2026-08-20 — filed planner FEATURE: blind reviewer over the JSONL (50+ problem classes) reporting back to the planner.
+- 2026-08-20 — nesting grammar locked in SPEC/Validate/interview: milestone is overlay; TASK-0004 expected model corrected; TASK-0006 Done.
+- 2026-08-20 — editor Gantt view: optional start/due overlay, ?view=gantt, TASK-0007 Done.
+- 2026-08-20 — two bars after mint: validate (quantitative schema, collect-all) then review (65 qualitative questions, 2 follow-ups, then human). TASK-0005 and TASK-0008 Done.
+- 2026-08-20 — created TASK-0009 jsonl and log.md are appended only by docket-prim
+- 2026-08-20 — edited TASK-0005
+- 2026-08-20 — edited TASK-0008
+- 2026-08-20 — edited TASK-0007
+- 2026-08-20 — created TASK-0010 DAG play shows topological waves
+- 2026-08-20 — completed TASK-0010
+- 2026-08-20 — created TASK-0011 VALIDATION cards close parents that have children
+- 2026-08-20 — completed TASK-0011
+- 2026-08-20 — created TASK-0012 editor JSON view of visible cards
+- 2026-08-20 — completed TASK-0012
+- 2026-08-20 — created TASK-0013 Fable Luna Sol engine plus Copy jsonl
+- 2026-08-20 — completed TASK-0013
+- 2026-08-20 — created TASK-0014 JSON view download and copy jsonl links
+- 2026-08-20 — completed TASK-0014
+- 2026-08-20 — created TASK-0015 DAG view puts GUARD cards in a Governs band
+- 2026-08-20 — completed TASK-0015
+- 2026-08-20 — created TASK-0016 Sidebar estimates prim bytes and tokens
+- 2026-08-20 — completed TASK-0016
+- 2026-08-20 — filed unread reading card: Git at Any Scale (Cursor).
