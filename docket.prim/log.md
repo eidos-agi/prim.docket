@@ -27,3 +27,7 @@
 - 2026-08-20 — created TASK-0016 Sidebar estimates prim bytes and tokens
 - 2026-08-20 — completed TASK-0016
 - 2026-08-20 — filed unread reading card: Git at Any Scale (Cursor).
+- 2026-08-20 — created TASK-0018 Gantt is rank not calendar dates
+- 2026-08-20 — completed TASK-0018
+- 2026-08-20 — created TASK-0019 DAG Gantt sections and responsive editor
+- 2026-08-20 — completed TASK-0019

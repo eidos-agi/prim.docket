@@ -22,14 +22,22 @@ Usage:
   docket-prim tool [--dir PATH] [--json]
   docket-prim convert [--from PATH] [--dir PATH] [--json]
   docket-prim init [--dir PATH] [--name NAME] [--id ID]
+  docket-prim planner --dir PATH --name TEXT --goal TEXT --done TEXT [--done TEXT] ...
+                   --proof PATH [--negative TEXT] [--out item|why] [--shipped item|why]
+                   [--linear ID] [--json]
+                   (or: docket-prim planner --json < PlanRequest.json)
   docket-prim info [--dir PATH] [--json]
-  docket-prim task-create --title TEXT [--status S] [--priority P] [--milestone ID]
-                          [--notes TEXT] [--blocked TEXT] [--parent ID]
+  docket-prim validate [--dir PATH] [--json]
+  docket-prim review [--dir PATH] [--json]
+  docket-prim task-create --title TEXT --notes TEXT --req TEXT [--req TEXT] --case TEXT [--case TEXT] --accept TEXT [--accept TEXT] ...
+                          [--type TASK|GOAL|PLAN|GUARD|TEST|VALIDATION] [--status S] [--priority P] [--milestone ID]
+                          [--blocked TEXT] [--parent ID] [--start YYYY-MM-DD] [--due YYYY-MM-DD]
                           [--tags a,b] [--assignees a,b] [--dir PATH] [--json]
   docket-prim task-list [--status S] [--dir PATH] [--json]
   docket-prim task-view ID [--dir PATH] [--json]
-  docket-prim task-edit ID [--title T] [--status S] [--priority P] [--milestone ID]
-                           [--notes TEXT] [--blocked TEXT] [--parent ID] [--dir PATH] [--json]
+  docket-prim task-edit ID [--title T] [--type TASK|GOAL|PLAN|GUARD|TEST|VALIDATION] [--status S] [--priority P] [--milestone ID]
+                           [--notes TEXT] [--req TEXT] [--case TEXT] [--accept TEXT] [--blocked TEXT] [--parent ID]
+                           [--start YYYY-MM-DD] [--due YYYY-MM-DD] [--dir PATH] [--json]
   docket-prim task-complete ID [--dir PATH] [--json]
   docket-prim task-archive ID [--dir PATH] [--json]
   docket-prim task-search QUERY [--dir PATH] [--json]
@@ -61,6 +69,9 @@ func main() {
 }
 
 func run(cmd string, args []string) error {
+	if cmd == "planner" || cmd == "plan" {
+		return runPlanner(args)
+	}
 	f := parseFlags(args)
 	switch cmd {
 	case "editor", "edit":
@@ -109,15 +120,62 @@ func run(cmd string, args []string) error {
 			"dir": p.Dir, "id": p.Project.ID, "name": p.Project.Name,
 			"tasks": len(p.Tasks), "milestones": len(p.Milestones), "archived": len(p.Archive),
 		}, f.json)
+	case "validate":
+		p, err := docket.Open(f.dir)
+		if err != nil {
+			return err
+		}
+		fs := docket.SchemaFindings(p)
+		if f.json {
+			if err := emit(map[string]any{
+				"ok":       len(fs) == 0,
+				"kind":     "schema",
+				"dir":      p.Dir,
+				"findings": fs,
+			}, true); err != nil {
+				return err
+			}
+			if len(fs) > 0 {
+				return fmt.Errorf("schema: %d findings", len(fs))
+			}
+			return nil
+		}
+		if err := docket.FindingsError(fs); err != nil {
+			return err
+		}
+		fmt.Println("ok")
+		return nil
+	case "review":
+		p, err := docket.Open(f.dir)
+		if err != nil {
+			return err
+		}
+		doc := docket.ReviewDoc(p)
+		if f.json {
+			return emit(map[string]any{
+				"kind":            "qualitative",
+				"dir":             p.Dir,
+				"follow_ups":      docket.FollowUps,
+				"question_count":  docket.ReviewQuestionCount(),
+				"prompt":          doc,
+			}, true)
+		}
+		fmt.Print(doc)
+		if !strings.HasSuffix(doc, "\n") {
+			fmt.Println()
+		}
+		return nil
 	case "task-create":
 		p, err := docket.Open(f.dir)
 		if err != nil {
 			return err
 		}
 		t, err := p.CreateTask(docket.Task{
-			Title: f.title, Status: f.status, Priority: f.priority, Milestone: f.milestone,
+			Title: f.title, Type: f.typ, Status: f.status, Priority: f.priority, Milestone: f.milestone,
 			Notes: f.notes, BlockedReason: f.blocked, Parent: f.parent,
+			Requirements: f.req, TestCases: f.cases, Acceptance: f.accept,
 			Tags: splitCSV(f.tags), Assignees: splitCSV(f.assignees),
+			Start: f.start, Due: f.due,
 		})
 		if err != nil {
 			return err
@@ -263,12 +321,14 @@ func run(cmd string, args []string) error {
 }
 
 type flags struct {
-	dir, from, name, id, title, status, priority, milestone, notes, blocked, parent string
-	tags, assignees, due, query                                                     string
-	port                                                                            int
-	json                                                                            bool
-	setTitle, setStatus, setPriority, setMilestone, setNotes, setBlocked, setParent bool
-	rest                                                                            []string
+	dir, from, name, id, title, typ, status, priority, milestone, notes, blocked, parent     string
+	tags, assignees, due, start, query                                                       string
+	req, cases, accept                                                                       []string
+	port                                                                                     int
+	json                                                                                     bool
+	setTitle, setType, setStatus, setPriority, setMilestone, setNotes, setBlocked, setParent bool
+	setReq, setCases, setAccept, setStart, setDue                                            bool
+	rest                                                                                     []string
 }
 
 func parseFlags(args []string) *flags {
@@ -294,6 +354,9 @@ func parseFlags(args []string) *flags {
 		case "--title":
 			f.title = take()
 			f.setTitle = true
+		case "--type":
+			f.typ = take()
+			f.setType = true
 		case "--status":
 			f.status = take()
 			f.setStatus = true
@@ -306,6 +369,15 @@ func parseFlags(args []string) *flags {
 		case "--notes":
 			f.notes = take()
 			f.setNotes = true
+		case "--req":
+			f.req = append(f.req, take())
+			f.setReq = true
+		case "--case":
+			f.cases = append(f.cases, take())
+			f.setCases = true
+		case "--accept":
+			f.accept = append(f.accept, take())
+			f.setAccept = true
 		case "--blocked":
 			f.blocked = take()
 			f.setBlocked = true
@@ -318,6 +390,10 @@ func parseFlags(args []string) *flags {
 			f.assignees = take()
 		case "--due":
 			f.due = take()
+			f.setDue = true
+		case "--start":
+			f.start = take()
+			f.setStart = true
 		case "--port":
 			n, err := strconv.Atoi(take())
 			if err != nil || n < 0 {
@@ -353,6 +429,9 @@ func (f *flags) edit() docket.TaskEdit {
 	if f.setTitle {
 		e.Title = &f.title
 	}
+	if f.setType {
+		e.Type = &f.typ
+	}
 	if f.setStatus {
 		e.Status = &f.status
 	}
@@ -370,6 +449,21 @@ func (f *flags) edit() docket.TaskEdit {
 	}
 	if f.setParent {
 		e.Parent = &f.parent
+	}
+	if f.setReq {
+		e.Requirements = &f.req
+	}
+	if f.setCases {
+		e.TestCases = &f.cases
+	}
+	if f.setAccept {
+		e.Acceptance = &f.accept
+	}
+	if f.setStart {
+		e.Start = &f.start
+	}
+	if f.setDue {
+		e.Due = &f.due
 	}
 	return e
 }

@@ -40,6 +40,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.page)
 	mux.HandleFunc("/api/state", s.state)
+	mux.HandleFunc("/api/rev", s.rev)
 	mux.HandleFunc("/api/tasks", s.tasks)
 	mux.HandleFunc("/api/tasks/", s.task)
 	return mux
@@ -85,6 +86,14 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(page)
 }
 
+func (s *Server) rev(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, map[string]string{"rev": docket.Rev(s.Dir)})
+}
+
 func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -100,6 +109,8 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	tool := p.Tool()
 	writeJSON(w, map[string]any{
 		"dir":        p.Dir,
+		"rev":        docket.Rev(p.Dir),
+		"size":       docket.SizeOf(p.Dir),
 		"project":    p.Project,
 		"tasks":      p.Tasks,
 		"milestones": p.Milestones,
@@ -116,12 +127,19 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 }
 
 type taskIn struct {
-	Title         *string `json:"title"`
-	Status        *string `json:"status"`
-	Priority      *string `json:"priority"`
-	Milestone     *string `json:"milestone"`
-	Notes         *string `json:"notes"`
-	BlockedReason *string `json:"blocked_reason"`
+	Title         *string  `json:"title"`
+	Type          *string  `json:"type"`
+	Status        *string  `json:"status"`
+	Priority      *string  `json:"priority"`
+	Milestone     *string  `json:"milestone"`
+	Parent        *string  `json:"parent"`
+	Notes         *string  `json:"notes"`
+	BlockedReason *string  `json:"blocked_reason"`
+	Requirements  []string `json:"requirements"`
+	TestCases     []string `json:"test-cases"`
+	Acceptance    []string `json:"acceptance-criteria"`
+	Start         *string  `json:"start"`
+	Due           *string  `json:"due"`
 }
 
 func (s *Server) tasks(w http.ResponseWriter, r *http.Request) {
@@ -142,8 +160,10 @@ func (s *Server) tasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t, err := p.CreateTask(docket.Task{
-		Title: deref(in.Title), Status: deref(in.Status), Priority: deref(in.Priority),
+		Title: deref(in.Title), Type: deref(in.Type), Status: deref(in.Status), Priority: deref(in.Priority),
 		Milestone: deref(in.Milestone), Notes: deref(in.Notes), BlockedReason: deref(in.BlockedReason),
+		Parent: deref(in.Parent), Requirements: in.Requirements, TestCases: in.TestCases, Acceptance: in.Acceptance,
+		Start: deref(in.Start), Due: deref(in.Due),
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -176,11 +196,18 @@ func (s *Server) task(w http.ResponseWriter, r *http.Request) {
 		}
 		t, err = p.EditTask(id, docket.TaskEdit{
 			Title:         in.Title,
+			Type:          in.Type,
 			Status:        in.Status,
 			Priority:      in.Priority,
 			Milestone:     in.Milestone,
+			Parent:        in.Parent,
 			Notes:         in.Notes,
 			BlockedReason: in.BlockedReason,
+			Requirements:  acceptEdit(in.Requirements),
+			TestCases:     acceptEdit(in.TestCases),
+			Acceptance:    acceptEdit(in.Acceptance),
+			Start:         in.Start,
+			Due:           in.Due,
 		})
 	case act == "complete" && r.Method == http.MethodPost:
 		t, err = p.CompleteTask(id)
@@ -202,6 +229,13 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func acceptEdit(rows []string) *[]string {
+	if rows == nil {
+		return nil
+	}
+	return &rows
 }
 
 func readJSON(r *http.Request, dest any) error {

@@ -14,6 +14,9 @@ import (
 const Version = "0.1.0"
 const Profile = "docket"
 
+// StoreFiles are the pack files Rev and SizeOf stamp. No parse.
+var StoreFiles = []string{"docket.json", "tasks.jsonl", "milestones.jsonl", "archive.jsonl", "index.md", "log.md"}
+
 type Project struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -75,7 +78,7 @@ func Open(dir string) (*Pack, error) {
 	if p.Tasks, err = readTasks(filepath.Join(root, "tasks.jsonl")); err != nil {
 		return nil, err
 	}
-	if p.Archive, err = readTasks(filepath.Join(root, "archive.jsonl")); err != nil {
+	if p.Archive, err = readArchive(filepath.Join(root, "archive.jsonl")); err != nil {
 		return nil, err
 	}
 	if p.Milestones, err = readMilestones(filepath.Join(root, "milestones.jsonl")); err != nil {
@@ -135,16 +138,78 @@ func Init(dir, name, id string) (*Pack, error) {
 }
 
 func (p *Pack) Save() error {
-	if err := writeJSON(filepath.Join(p.Dir, "docket.json"), p.Project); err != nil {
+	return writeJSON(filepath.Join(p.Dir, "docket.json"), p.Project)
+}
+
+func (p *Pack) appendTask(t Task) error {
+	return appendJSONL(filepath.Join(p.Dir, "tasks.jsonl"), t)
+}
+
+func (p *Pack) appendMilestone(m Milestone) error {
+	return appendJSONL(filepath.Join(p.Dir, "milestones.jsonl"), m)
+}
+
+func (p *Pack) appendArchive(t Task) error {
+	return appendJSONL(filepath.Join(p.Dir, "archive.jsonl"), t)
+}
+
+func (p *Pack) persistRows() error {
+	if err := p.Save(); err != nil {
 		return err
 	}
-	if err := writeJSONL(filepath.Join(p.Dir, "tasks.jsonl"), p.Tasks); err != nil {
-		return err
+	for _, t := range p.Tasks {
+		if err := p.appendTask(t); err != nil {
+			return err
+		}
 	}
-	if err := writeJSONL(filepath.Join(p.Dir, "milestones.jsonl"), p.Milestones); err != nil {
-		return err
+	for _, t := range p.Archive {
+		if err := p.appendArchive(t); err != nil {
+			return err
+		}
 	}
-	return writeJSONL(filepath.Join(p.Dir, "archive.jsonl"), p.Archive)
+	for _, m := range p.Milestones {
+		if err := p.appendMilestone(m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Size is on-disk bytes for the pack files. jsonl is tasks.jsonl alone.
+type Size struct {
+	Bytes int64            `json:"bytes"`
+	JSONL int64            `json:"jsonl"`
+	Files map[string]int64 `json:"files"`
+}
+
+// SizeOf sums StoreFiles. Missing files count as zero.
+func SizeOf(dir string) Size {
+	out := Size{Files: map[string]int64{}}
+	for _, name := range StoreFiles {
+		st, err := os.Stat(filepath.Join(dir, name))
+		if err != nil {
+			continue
+		}
+		out.Files[name] = st.Size()
+		out.Bytes += st.Size()
+		if name == "tasks.jsonl" {
+			out.JSONL = st.Size()
+		}
+	}
+	return out
+}
+
+// Rev is a cheap pack stamp: mtime+size of the store files. No parse.
+func Rev(dir string) string {
+	var b strings.Builder
+	for _, name := range StoreFiles {
+		st, err := os.Stat(filepath.Join(dir, name))
+		if err != nil {
+			continue
+		}
+		fmt.Fprintf(&b, "%s:%d:%d;", name, st.ModTime().UnixNano(), st.Size())
+	}
+	return b.String()
 }
 
 func (p *Pack) Log(line string) error {
@@ -206,6 +271,26 @@ func writeJSONL[T any](path string, rows []T) error {
 	return writeAtomic(path, buf.Bytes())
 }
 
+// appendJSONL is the only legal jsonl write. Pack.appendTask / appendMilestone /
+// appendArchive (planner, task-*, milestone-*, convert, editor) call it.
+// Agents never write these files. Encode into a buffer then one Write so a
+// crash cannot leave a truncated line.
+func appendJSONL(path string, row any) error {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(row); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write(buf.Bytes())
+	return err
+}
+
 func writeAtomic(path string, body []byte) error {
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, body, 0o644); err != nil {
@@ -248,8 +333,75 @@ func readJSONL[T any](path string) ([]T, error) {
 	return rows, sc.Err()
 }
 
-func readTasks(path string) ([]Task, error) { return readJSONL[Task](path) }
+func readTasks(path string) ([]Task, error) {
+	raw, err := readJSONL[Task](path)
+	if err != nil {
+		return nil, err
+	}
+	order := make([]string, 0, len(raw))
+	by := make(map[string]Task, len(raw))
+	for _, t := range raw {
+		if t.ID == "" {
+			continue
+		}
+		if _, ok := by[t.ID]; !ok {
+			order = append(order, t.ID)
+		}
+		by[t.ID] = t
+	}
+	out := make([]Task, 0, len(order))
+	for _, id := range order {
+		t := by[id]
+		if t.Archived {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}
 
 func readMilestones(path string) ([]Milestone, error) {
-	return readJSONL[Milestone](path)
+	raw, err := readJSONL[Milestone](path)
+	if err != nil {
+		return nil, err
+	}
+	order := make([]string, 0, len(raw))
+	by := make(map[string]Milestone, len(raw))
+	for _, m := range raw {
+		if m.ID == "" {
+			continue
+		}
+		if _, ok := by[m.ID]; !ok {
+			order = append(order, m.ID)
+		}
+		by[m.ID] = m
+	}
+	out := make([]Milestone, 0, len(order))
+	for _, id := range order {
+		out = append(out, by[id])
+	}
+	return out, nil
+}
+
+func readArchive(path string) ([]Task, error) {
+	raw, err := readJSONL[Task](path)
+	if err != nil {
+		return nil, err
+	}
+	order := make([]string, 0, len(raw))
+	by := make(map[string]Task, len(raw))
+	for _, t := range raw {
+		if t.ID == "" {
+			continue
+		}
+		if _, ok := by[t.ID]; !ok {
+			order = append(order, t.ID)
+		}
+		by[t.ID] = t
+	}
+	out := make([]Task, 0, len(order))
+	for _, id := range order {
+		out = append(out, by[id])
+	}
+	return out, nil
 }

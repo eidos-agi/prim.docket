@@ -1,0 +1,41 @@
+{
+  "description": "docket-prim Go tests: go test ./... and go build of the editor binary.",
+  "detect_warning": "No committed .testr/product-test-model.json. Detection invents starter tests (often too heavy, e.g. full npm test). Hand-edit path-relevant commands, commit, then never re-detect over it without --force.",
+  "evidence_paths": [
+    "test output / junit / coverage when configured"
+  ],
+  "learning_questions": [
+    "What failed that the ship path assumed green?",
+    "Which test should become a shipr proof_command?",
+    "What is flaky vs broken?"
+  ],
+  "memory_paths": {
+    "attempts_dir": ".testr/test-attempts",
+    "model": ".testr/product-test-model.json"
+  },
+  "methods_source": "test-forge (retired) → testr",
+  "model_path": "/Users/dshanklinbv/repos-eidos-agi/prim.docket/.testr/product-test-model.json",
+  "model_source": "detected",
+  "product_id": "prim.docket",
+  "project_root": "/Users/dshanklinbv/repos-eidos-agi/prim.docket",
+  "purpose": "Tell AI agents how this product is proven. Store repeatable test config and attempt ledgers. Does not execute tests.",
+  "related_operators": [
+    "shipr"
+  ],
+  "related_shipr": {
+    "loaded": false,
+    "model_path": ".shipr/product-release-model.json",
+    "note": "shipr should use these test_commands as proof_commands when shipping",
+    "operator": "shipr"
+  },
+  "role": "ai_config_and_memory",
+  "schema_version": 1,
+  "test_commands": [
+    "go test ./...",
+    "go build ./..."
+  ],
+  "test_suites": [
+    "go"
+  ],
+  "updated_at": "2026-08-20T23:19:56.094458Z"
+}

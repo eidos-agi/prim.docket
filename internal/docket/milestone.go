@@ -7,6 +7,7 @@ import (
 
 type Milestone struct {
 	ID      string `json:"id"`
+	UID     string `json:"uid"`
 	Title   string `json:"title"`
 	Status  string `json:"status,omitempty"`
 	Due     string `json:"due,omitempty"`
@@ -29,15 +30,23 @@ func (p *Pack) CreateMilestone(title, due string) (Milestone, error) {
 	if strings.TrimSpace(title) == "" {
 		return Milestone{}, fmt.Errorf("title required")
 	}
+	if err := CheckDay(due); err != nil {
+		return Milestone{}, fmt.Errorf("due: %w", err)
+	}
+	uid, err := NewUID()
+	if err != nil {
+		return Milestone{}, err
+	}
 	m := Milestone{
 		ID:      p.NextMilestoneID(),
+		UID:     uid,
 		Title:   title,
 		Status:  "open",
 		Due:     due,
 		Created: Today(),
 	}
 	p.Milestones = append(p.Milestones, m)
-	if err := p.Save(); err != nil {
+	if err := p.appendMilestone(m); err != nil {
 		return Milestone{}, err
 	}
 	if err := p.Log("created " + m.ID + " " + m.Title); err != nil {
@@ -51,7 +60,10 @@ func (p *Pack) CloseMilestone(id string) (Milestone, error) {
 		if p.Milestones[i].ID == id {
 			p.Milestones[i].Status = "closed"
 			p.Milestones[i].Updated = Today()
-			if err := p.Save(); err != nil {
+			if err := fillUID(&p.Milestones[i].UID); err != nil {
+				return Milestone{}, err
+			}
+			if err := p.appendMilestone(p.Milestones[i]); err != nil {
 				return Milestone{}, err
 			}
 			if err := p.Log("closed " + id); err != nil {

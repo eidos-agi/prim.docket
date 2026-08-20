@@ -11,6 +11,8 @@ Same job as [docket.md](https://github.com/eidos-agi/docket.md): schedule, dispa
 | **docket-md** | People who want markdown | `.docket/**/*.md` |
 | **docket-prim** | People using the Prim format | this pack (`tasks.jsonl`) |
 
+The pack is the file. Fable plans it, Luna executes nodes cheap, Sol closes each subtree expensive (VALIDATION). The LLM is the engine.
+
 This is not a wrap of the markdown tree. `docket-prim editor` opens the surface. `docket-prim tool` prints the pairing.
 
 ```bash
@@ -23,6 +25,8 @@ go install ./cmd/docket-prim
 docket-prim editor --dir /path/to/docket.prim
 docket-prim convert --from /path/to/project          # .docket/ → docket.prim
 docket-prim init --name Cerebro
+docket-prim planner --dir ./notes/dockets/slice --name "outcome" --goal "outcome" \
+  --done "proofable thing" --proof notes/goals/proof/x.md --json
 docket-prim task-create --title "Ship login" --priority high
 docket-prim task-list
 docket-prim task-edit TASK-0001 --status "In Progress"

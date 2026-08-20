@@ -1,0 +1,51 @@
+{
+  "blocker_records": [],
+  "blockers": [],
+  "created_at": "2026-08-20T23:20:56.209001Z",
+  "gate_summary": [],
+  "goal": "Release docket-prim editor (JSON/DAG/Gantt, validate, CLI-only jsonl) to origin/main",
+  "learning_prompts": [
+    "What broke or slowed this release?",
+    "What proof was missing until late?",
+    "Which gate should become automatic next time?",
+    "Which human approval should remain explicit?"
+  ],
+  "next_actions": [
+    "clear the blocker, then re-run the product's proof_commands (AI runs them; shipr only records)"
+  ],
+  "notes": "Proofs green. Blocked: no hosted /health.revision for this Go CLI. git push is not shipped until a live revision matches HEAD; ship path is go install from the tagged commit.",
+  "product_id": "prim.docket",
+  "proofs": [
+    "go test ./...",
+    "go build ./cmd/docket-prim"
+  ],
+  "release_model_snapshot": {
+    "approval_gates": [
+      "credentials",
+      "payments",
+      "production mutations",
+      "public publish/tag",
+      "customer/outbound messaging"
+    ],
+    "artifact_types": [
+      "go-module"
+    ],
+    "distribution_channels": [
+      "go install / binary"
+    ],
+    "forge_stack": [
+      "testr"
+    ],
+    "license": null,
+    "open_source_status": "unknown",
+    "proof_commands": [
+      "go test ./...",
+      "go build ./..."
+    ],
+    "proof_source": "testr",
+    "repository_visibility": "public"
+  },
+  "schema_version": 1,
+  "source": null,
+  "status": "blocked"
+}

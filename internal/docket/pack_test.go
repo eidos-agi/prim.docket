@@ -1,6 +1,7 @@
 package docket
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,20 +20,31 @@ func TestInitCreateEditCompleteArchive(t *testing.T) {
 		t.Fatalf("name %q", p.Project.Name)
 	}
 
-	a, err := p.CreateTask(Task{Title: "Ship login", Priority: "high"})
+	in := live("Ship login")
+	in.Priority = "high"
+	a, err := p.CreateTask(in)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if a.ID != "TASK-0001" || a.Status != "To Do" {
 		t.Fatalf("create %+v", a)
 	}
+	if err := CheckUID(a.UID); err != nil {
+		t.Fatal(err)
+	}
 
-	b, err := p.CreateTask(Task{Title: "Write docs"})
+	b, err := p.CreateTask(live("Write docs"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if b.ID != "TASK-0002" {
 		t.Fatalf("id %s", b.ID)
+	}
+	if err := CheckUID(b.UID); err != nil {
+		t.Fatal(err)
+	}
+	if a.UID == b.UID {
+		t.Fatal("uid collision")
 	}
 
 	title := "Ship login now"
@@ -49,6 +61,9 @@ func TestInitCreateEditCompleteArchive(t *testing.T) {
 	got, _, ok := re.Task("TASK-0001")
 	if !ok || got.Title != title || got.Status != status {
 		t.Fatalf("reload %+v", got)
+	}
+	if got.UID != a.UID {
+		t.Fatalf("uid changed %s -> %s", a.UID, got.UID)
 	}
 	if len(re.ListTasks("In Progress")) != 1 {
 		t.Fatal("list status")
@@ -104,7 +119,7 @@ func TestRejectsBadStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.CreateTask(Task{Title: "A", Status: "Nope"}); err == nil {
+	if _, err := p.CreateTask(Task{Title: "A", Status: "Nope", Notes: "x that is not A", Acceptance: []string{"y"}}); err == nil {
 		t.Fatal("expected invalid status")
 	}
 }
@@ -130,6 +145,82 @@ func TestToolCitesThePack(t *testing.T) {
 	}
 }
 
+func TestRevMovesOnWrite(t *testing.T) {
+	dir := t.TempDir()
+	p, err := Init(dir, "Fixture", "fix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := Rev(dir)
+	if before == "" {
+		t.Fatal("empty rev")
+	}
+	if _, err := p.CreateTask(live("Watch me")); err != nil {
+		t.Fatal(err)
+	}
+	after := Rev(dir)
+	if after == before {
+		t.Fatal("rev did not move after write")
+	}
+}
+
+func TestCreateTaskRejectsTitleOnly(t *testing.T) {
+	dir := t.TempDir()
+	p, err := Init(dir, "Fixture", "fix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.CreateTask(Task{Title: "Ship login"}); err == nil || !bytes.Contains([]byte(err.Error()), []byte("notes required")) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestJSONLAppendOnlyLastLineWins(t *testing.T) {
+	dir := t.TempDir()
+	p, err := Init(dir, "Fixture", "fix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.CreateTask(live("Ship login")); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "tasks.jsonl")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n1 := bytes.Count(before, []byte("\n"))
+	if n1 < 1 {
+		t.Fatalf("expected create line, got %d", n1)
+	}
+	title := "Ship login now"
+	if _, err := p.EditTask("TASK-0001", TaskEdit{Title: &title}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n2 := bytes.Count(after, []byte("\n"))
+	if n2 <= n1 {
+		t.Fatalf("edit rewrote instead of append: %d -> %d", n1, n2)
+	}
+	if !bytes.Contains(after, []byte("Ship login")) || !bytes.Contains(after, []byte("Ship login now")) {
+		t.Fatalf("expected both titles in file:\n%s", after)
+	}
+	re, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _, ok := re.Task("TASK-0001")
+	if !ok || got.Title != title {
+		t.Fatalf("fold %+v", got)
+	}
+	if len(re.Tasks) != 1 {
+		t.Fatalf("live count %d", len(re.Tasks))
+	}
+}
+
 func TestDoesNotTreatMarkdownDocketAsPack(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "docket.json"), []byte(`{"id":"md"}`), 0o644); err != nil {
@@ -137,6 +228,89 @@ func TestDoesNotTreatMarkdownDocketAsPack(t *testing.T) {
 	}
 	if IsPack(dir) {
 		t.Fatal("bare docket.json is docket-md shape, not a prim")
+	}
+}
+
+func TestStartDueRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	p, err := Init(dir, "Fixture", "fix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := live("Ship login")
+	in.Start = "2026-08-20"
+	in.Due = "2026-09-01"
+	a, err := p.CreateTask(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Start != "2026-08-20" || a.Due != "2026-09-01" {
+		t.Fatalf("create %+v", a)
+	}
+	due := "2026-09-15"
+	if _, err := p.EditTask(a.ID, TaskEdit{Due: &due}); err != nil {
+		t.Fatal(err)
+	}
+	re, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _, ok := re.Task(a.ID)
+	if !ok || got.Start != "2026-08-20" || got.Due != "2026-09-15" {
+		t.Fatalf("reload %+v", got)
+	}
+	bad := live("Bad date")
+	bad.Due = "08/20/2026"
+	if _, err := p.CreateTask(bad); err == nil {
+		t.Fatal("expected bad due")
+	}
+}
+
+func TestAppendJSONLCanonicalLine(t *testing.T) {
+	row := live("Ship login")
+	row.ID = "TASK-0001"
+	uid, err := NewUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	row.UID = uid
+	row.Status = "To Do"
+	path := filepath.Join(t.TempDir(), "tasks.jsonl")
+	if err := appendJSONL(path, row); err != nil {
+		t.Fatal(err)
+	}
+	if err := appendJSONL(path, row); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := bytes.Split(bytes.TrimSpace(b), []byte("\n"))
+	if len(lines) != 2 || !bytes.Equal(lines[0], lines[1]) {
+		t.Fatalf("encoder not stable:\n%s\n%s", lines[0], lines[1])
+	}
+}
+
+func TestSizeOfCountsPackFiles(t *testing.T) {
+	dir := t.TempDir()
+	p, err := Init(dir, "Fixture", "fix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := SizeOf(p.Dir)
+	if before.Bytes <= 0 {
+		t.Fatalf("empty pack size %+v", before)
+	}
+	if _, err := p.CreateTask(live("Ship login")); err != nil {
+		t.Fatal(err)
+	}
+	after := SizeOf(p.Dir)
+	if after.JSONL <= before.JSONL || after.Bytes <= before.Bytes {
+		t.Fatalf("size did not grow after create: before %+v after %+v", before, after)
+	}
+	if after.JSONL != after.Files["tasks.jsonl"] {
+		t.Fatalf("jsonl mismatch %+v", after)
 	}
 }
 

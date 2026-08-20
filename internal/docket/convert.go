@@ -99,7 +99,30 @@ func ConvertMarkdown(from, dest string) (*Pack, error) {
 	p.Tasks = append(tasks, completed...)
 	p.Archive = archived
 	p.Milestones = miles
-	if err := p.Save(); err != nil {
+	for i := range p.Tasks {
+		if err := fillUID(&p.Tasks[i].UID); err != nil {
+			return nil, fmt.Errorf("convert %s: %w", p.Tasks[i].ID, err)
+		}
+	}
+	for i := range p.Archive {
+		if err := fillUID(&p.Archive[i].UID); err != nil {
+			return nil, fmt.Errorf("convert archive %s: %w", p.Archive[i].ID, err)
+		}
+	}
+	for i := range p.Milestones {
+		if err := fillUID(&p.Milestones[i].UID); err != nil {
+			return nil, fmt.Errorf("convert %s: %w", p.Milestones[i].ID, err)
+		}
+	}
+	for _, t := range p.Tasks {
+		if err := CheckCard(t); err != nil {
+			return nil, fmt.Errorf("convert %s: %w", t.ID, err)
+		}
+		if err := p.CheckGuard(t); err != nil {
+			return nil, fmt.Errorf("convert %s: %w", t.ID, err)
+		}
+	}
+	if err := p.persistRows(); err != nil {
 		return nil, err
 	}
 	if err := p.Log(fmt.Sprintf("converted from %s (%d tasks, %d milestones)", src, len(p.Tasks), len(p.Milestones))); err != nil {
@@ -180,6 +203,7 @@ func taskFromMap(fm map[string]any) Task {
 	return Task{
 		ID:            asString(fm["id"]),
 		Title:         asString(fm["title"]),
+		Type:          asString(fm["type"]),
 		Status:        status,
 		Priority:      pri,
 		Milestone:     asString(fm["milestone"]),
@@ -188,11 +212,15 @@ func taskFromMap(fm map[string]any) Task {
 		Assignees:     asStrings(fm["assignees"]),
 		Tags:          asStrings(fm["tags"]),
 		Dependencies:  asStrings(fm["dependencies"]),
+		Requirements:  firstStrings(fm, "requirements"),
+		TestCases:     firstStrings(fm, "test-cases", "test_cases"),
 		Acceptance:    firstStrings(fm, "acceptance-criteria", "acceptance_criteria"),
 		DOD:           firstStrings(fm, "definition-of-done", "definition_of_done"),
 		BlockedReason: asString(fm["blocked_reason"]),
 		Created:       asString(fm["created"]),
 		Updated:       asString(fm["updated"]),
+		Start:         asString(fm["start"]),
+		Due:           asString(fm["due"]),
 	}
 }
 
